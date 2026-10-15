@@ -22,12 +22,12 @@ flarum1.x运行环境历史悠久，运行环境多种多样，我也没在别�
 ```
 pecl install swoole
 ```
-2. 把非侵入式入口文件`flarum-swoole-woker.php`或者`flarum-swoole-co.php`+`AutoBatchingDataLoader.php`放在flarum根目录（和vendor文件夹平级）
+2. 把非侵入式入口文件`flarum-swoole-worker.php`或者`flarum-swoole-co.php`+`AutoBatchingDataLoader.php`放在flarum根目录（和vendor文件夹平级）
 
 3. 启动
 
 ```
-php flarum-swoole-woker-co.php start
+php flarum-swoole-worker-co.php start
 ```
 
 - 如果成功，swoole会运行在并监听/tmp/flarum.sock(可以根据需要改成端口通信)，然后在nginx等网关配置反代即可。
@@ -201,7 +201,7 @@ return [
 
 ## 压测
 关掉全部缓存机制，完整鉴权和序列化的纯动态请求。主机是虽Platinum 8272CL但gb5单核450分的[netlab超兽洋垃圾](https://browser.geekbench.com/v5/cpu/24274234)（太乐子了必须分享一下，~~不要买netlab上游~~）主机，除了线路海星~~但是大小包还禁udp~~一无是处。
-### woker模式
+### worker模式
 <img width="3651" height="433" alt="image" src="https://github.com/user-attachments/assets/6e255a2e-8824-4e8a-bf7b-a08ad14b2d3a" />
 <img width="3729" height="439" alt="image" src="https://github.com/user-attachments/assets/19063cff-add2-4179-ae0e-27e036d716bf" />
 <img width="1231" height="210" alt="image" src="https://github.com/user-attachments/assets/7b82c3e6-3b71-4695-ba1b-fe9f5feec240" />
@@ -216,7 +216,7 @@ return [
 
 # 已知的问题
 
-性能会随着时间和请求数量逐渐退化，并且只要woker没被杀掉重启，就会一直退化，退化程度（响应时间增加）高达50%-100%。靠配置max_request等方式平滑重启可以解决，但是肯要付出一点性能（比如满载的时候，轮到重启了，就会少一个woker，平时一秒能拉起来，满载就不好说了）
+性能会随着时间和请求数量逐渐退化，并且只要worker没被杀掉重启，就会一直退化，退化程度（响应时间增加）高达50%-100%。靠配置max_request等方式平滑重启可以解决，但是肯要付出一点性能（比如满载的时候，轮到重启了，就会少一个worker，平时一秒能拉起来，满载就不好说了）
 
 由于内存占用正常，应该没有泄露，推测是内存碎片化的原因，但实际原因仍然没有验证。
 
@@ -227,9 +227,9 @@ co版本重写了Serializer依赖的api，并发执行序列化，合并能够�
 
 但是如果自己照着日志把follow tags、follow users，fof badgegs，fof polls等插件的n+1查询改了，就几乎没有提升了。
 
-而co模式相比woker模式本身有隔离作用域和各种反射的额外开销，纯计算性能还要差一点，所以具体用哪种模式还要根据实际情况。
+而co模式相比worker模式本身有隔离作用域和各种反射的额外开销，纯计算性能还要差一点，所以具体用哪种模式还要根据实际情况。
 
-部分时间woker模式的峰值表现甚至还要略好一些，明明co模式要难写得多，郁闷……但是满负载情况下还是能看出差距，虽然能承受的吞吐量一样，但co模式得益于调度更合理，单个请求返回能快很多。
+部分时间worker模式的峰值表现甚至还要略好一些，明明co模式要难写得多，郁闷……但是满负载情况下还是能看出差距，虽然能承受的吞吐量一样，但co模式得益于调度更合理，单个请求返回能快很多。
 
 总的来说即使很大程度上解决了序列化过程中的n+1问题，但是不论用哪种模式，不缓存的话真正的瓶颈始终在cpu。
 
@@ -248,7 +248,7 @@ co版本重写了Serializer依赖的api，并发执行序列化，合并能够�
 > 
 > 在后端n+1和计算问题严重的情况下，该常驻的常驻后，把请求拆成在前端n+1的办法的额外开销居然挺小的……
 > 
-> 因为swoole节省了容器启动的部分时间（不论co模式还是woker模式），小型请求的初始水位降低，用户就能得到几乎及时的反馈（前提是你的机器线路够好,三网全红就算了）。
+> 因为swoole节省了容器启动的部分时间（不论co模式还是worker模式），小型请求的初始水位降低，用户就能得到几乎及时的反馈（前提是你的机器线路够好,三网全红就算了）。
 
 对于flarum最后也是最麻烦的性能问题，cpu计算过于密集，而且因为这东西渲染帖子正文都是要注入权限组，和其他任何插件作者想的数据模型的甚至可以临时查表的，要缓存的话策略得根据自己的插件组合来定制，所以并没有包含在公开库内，cpu纯计算阻塞会严重影响主机资源利用率，能做的有限。
 
